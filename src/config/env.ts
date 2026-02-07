@@ -57,7 +57,7 @@ export function loadEnv(): Env {
   } catch (error) {
     if (error instanceof z.ZodError) {
       console.error('❌ Invalid environment variables:')
-      console.error(JSON.stringify(error.format(), null, 2))
+      console.error(JSON.stringify(z.treeifyError(error), null, 2))
       process.exit(1)
     }
     throw error
