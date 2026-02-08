@@ -1,7 +1,9 @@
 /**
- * Dependency Injection Tokens
+ * Core Dependency Injection Tokens
  *
- * Symbols used as unique identifiers for dependency injection.
+ * Symbols used as unique identifiers for core/shared dependencies.
+ * Module-specific tokens live inside each module (e.g. identity.tokens.ts).
+ *
  * Using symbols instead of strings provides:
  * - Type safety
  * - No naming collisions
@@ -10,45 +12,25 @@
  *
  * @example
  * ```typescript
- * // Register
- * container.register(TOKENS.ILogger, { useClass: ConsoleLogger })
+ * import { container } from 'tsyringe'
+ * import { TOKENS } from '@/config/tokens'
  *
- * // Resolve
+ * container.register(TOKENS.ILogger, { useFactory: () => new ConsoleLogger('info') })
  * const logger = container.resolve<ILogger>(TOKENS.ILogger)
  * ```
  */
-
-// Core Dependencies
 export const TOKENS = {
-  // Configuration
+  // ── Core ─────────────────────────────────────────────────────────────
   Config: Symbol.for('Config'),
-
-  // Logging
   ILogger: Symbol.for('ILogger'),
+  PrismaClient: Symbol.for('PrismaClient'),
 
-  // Middlewares
+  // ── Middleware ───────────────────────────────────────────────────────
+  CorsMiddleware: Symbol.for('CorsMiddleware'),
   RequestIdMiddleware: Symbol.for('RequestIdMiddleware'),
   LoggerMiddleware: Symbol.for('LoggerMiddleware'),
-  CorsMiddleware: Symbol.for('CorsMiddleware'),
   NotFoundMiddleware: Symbol.for('NotFoundMiddleware'),
-  ErrorHandlerMiddleware: Symbol.for('ErrorHandlerMiddleware'),
-
-  // Database (future)
-  PrismaClient: Symbol.for('PrismaClient'),
-  DatabaseConnection: Symbol.for('DatabaseConnection'),
-
-  // Repositories (future)
-  UserRepository: Symbol.for('UserRepository'),
-
-  // Use Cases (future)
-  CreateUserUseCase: Symbol.for('CreateUserUseCase'),
-
-  // Controllers (future)
-  UserController: Symbol.for('UserController'),
-
-  // Routes (future)
-  AuthRoutes: Symbol.for('AuthRoutes'),
-  UserRoutes: Symbol.for('UserRoutes')
+  ErrorHandlerMiddleware: Symbol.for('ErrorHandlerMiddleware')
 } as const
 
 /**
