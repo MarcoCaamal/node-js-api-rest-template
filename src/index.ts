@@ -3,48 +3,36 @@
  *
  * Bootstrap sequence:
  * 1. Load and validate configuration
- * 2. Setup dependency injection container
+ * 2. Initialize DI container (registers all dependencies)
  * 3. Create and start application
  * 4. Setup graceful shutdown handlers
  */
 
 import { Config } from '@/config'
-import { Container } from '@/config/container'
+import { initContainer, disposeContainer } from '@/config/container'
 import { App } from './app'
 
 /**
  * Bootstrap the application
  */
-async function bootstrap(): Promise<void> {
-  try {
-    // 1. Load configuration
-    const config = Config.load()
+async function bootstrap() {
+  const config = Config.load()
 
-    // 2. Setup dependency injection
-    Container.setup(config)
+  // 2. Initialize dependency injection container
+  await initContainer(config)
 
-    // 3. Create application
-    const app = new App()
+  // 3. Create application (resolves everything from container)
+  const app = new App()
 
-    // 4. Setup graceful shutdown
-    process.on('SIGTERM', async () => {
-      console.log('SIGTERM received, shutting down...')
-      await app.shutdown()
-      process.exit(0)
-    })
+  // Start application
+  const server = await app.start()
 
-    process.on('SIGINT', async () => {
-      console.log('SIGINT received, shutting down...')
-      await app.shutdown()
-      process.exit(0)
-    })
-
-    // 5. Start application
-    await app.start()
-  } catch (error) {
-    console.error('Failed to start application:', error)
-    process.exit(1)
+  const shutdown = async () => {
+    await disposeContainer()
+    server.close(() => process.exit(0))
   }
+  process.on('SIGTERM', () => shutdown())
+  process.on('SIGINT', () => shutdown())
 }
 
 // Start the application
