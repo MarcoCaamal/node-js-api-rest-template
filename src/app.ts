@@ -1,20 +1,21 @@
 import express, { Express } from 'express'
-import { Config } from '@/config'
-import { Container } from '@/config/container'
-import { TOKENS } from '@/config/tokens'
+import { container } from 'tsyringe'
+import { Config, TOKENS } from '@/config'
 import { ILogger } from '@/lib/logger'
-import {
-  RequestIdMiddleware,
-  LoggerMiddleware,
-  CorsMiddleware,
-  ErrorHandlerMiddleware,
-  NotFoundMiddleware
-} from '@/modules/common/middleware'
+import { CorsMiddleware } from '@/modules/common/middleware/cors.middleware'
+import { RequestIdMiddleware } from '@/modules/common/middleware/request-id.middleware'
+import { LoggerMiddleware } from '@/modules/common/middleware/logger.middleware'
+import { NotFoundMiddleware } from '@/modules/common/middleware/not-found.middleware'
+import { ErrorHandlerMiddleware } from '@/modules/common/middleware/error-handler.middleware'
+import { PermissionsRoutes } from '@/modules/identity/infrastructure/http/routes/permissions.routes'
+import { IDENTITY_TOKENS } from '@/modules/identity/identity.tokens'
 
 /**
  * App - Application orchestrator
  *
+ * Resolves all dependencies from the tsyringe container.
  * Configures and manages the Express application lifecycle.
+ *
  * Responsibilities:
  * - Setup middlewares in correct order
  * - Register module routes
@@ -24,8 +25,7 @@ import {
  * @example
  * ```typescript
  * const config = Config.load()
- * Container.setup(config)
- *
+ * await initContainer(config)
  * const app = new App()
  * await app.start()
  * ```
@@ -35,10 +35,32 @@ export class App {
   private readonly config: Config
   private readonly logger: ILogger
 
+  // Middlewares — resolved from container
+  private readonly corsMiddleware: CorsMiddleware
+  private readonly requestIdMiddleware: RequestIdMiddleware
+  private readonly loggerMiddleware: LoggerMiddleware
+  private readonly notFoundMiddleware: NotFoundMiddleware
+  private readonly errorHandlerMiddleware: ErrorHandlerMiddleware
+
+  // Module routes — resolved from container
+  private readonly permissionsRoutes: PermissionsRoutes
+
   constructor() {
-    // Resolve dependencies from container
-    this.config = Container.resolve<Config>(TOKENS.Config)
-    this.logger = Container.resolve<ILogger>(TOKENS.ILogger)
+    // Resolve core dependencies
+    this.config = container.resolve<Config>(TOKENS.Config)
+    this.logger = container.resolve<ILogger>(TOKENS.ILogger)
+
+    // Resolve middlewares
+    this.corsMiddleware = container.resolve<CorsMiddleware>(TOKENS.CorsMiddleware)
+    this.requestIdMiddleware = container.resolve<RequestIdMiddleware>(TOKENS.RequestIdMiddleware)
+    this.loggerMiddleware = container.resolve<LoggerMiddleware>(TOKENS.LoggerMiddleware)
+    this.notFoundMiddleware = container.resolve<NotFoundMiddleware>(TOKENS.NotFoundMiddleware)
+    this.errorHandlerMiddleware = container.resolve<ErrorHandlerMiddleware>(
+      TOKENS.ErrorHandlerMiddleware
+    )
+
+    // Resolve module routes
+    this.permissionsRoutes = container.resolve<PermissionsRoutes>(IDENTITY_TOKENS.PermissionsRoutes)
 
     // Create Express app
     this.app = express()
@@ -53,7 +75,7 @@ export class App {
 
   /**
    * Setup global middlewares
-   * ORDER MATTERS: cors -> requestId -> logger -> body parsing
+   * ORDER MATTERS: body parsing -> cors -> requestId -> logger
    */
   private setupMiddlewares(): void {
     // Body parsing
@@ -61,16 +83,13 @@ export class App {
     this.app.use(express.urlencoded({ extended: true }))
 
     // CORS (must be first to handle preflight requests)
-    const corsMiddleware = Container.resolve<CorsMiddleware>(TOKENS.CorsMiddleware)
-    this.app.use(corsMiddleware.handle.bind(corsMiddleware))
+    this.app.use(this.corsMiddleware.handle.bind(this.corsMiddleware))
 
     // Request ID (must be early to be available in all logs)
-    const requestIdMiddleware = Container.resolve<RequestIdMiddleware>(TOKENS.RequestIdMiddleware)
-    this.app.use(requestIdMiddleware.handle.bind(requestIdMiddleware))
+    this.app.use(this.requestIdMiddleware.handle.bind(this.requestIdMiddleware))
 
     // Logger (after requestId to include it in logs)
-    const loggerMiddleware = Container.resolve<LoggerMiddleware>(TOKENS.LoggerMiddleware)
-    this.app.use(loggerMiddleware.handle.bind(loggerMiddleware))
+    this.app.use(this.loggerMiddleware.handle.bind(this.loggerMiddleware))
 
     this.logger.info('Global middlewares configured')
   }
@@ -98,12 +117,8 @@ export class App {
       })
     })
 
-    // TODO: Register module routes
-    // Example:
-    // const authRoutes = Container.resolve(TOKENS.AuthRoutes)
-    // const userRoutes = Container.resolve(TOKENS.UserRoutes)
-    // this.app.use('/api/v1/auth', authRoutes)
-    // this.app.use('/api/v1/users', userRoutes)
+    // Register module routes
+    this.app.use('/api/permissions', this.permissionsRoutes.getRouter())
 
     this.logger.info('Routes configured')
   }
@@ -114,14 +129,10 @@ export class App {
    */
   private setupErrorHandlers(): void {
     // 404 handler for undefined routes (before error handler)
-    const notFoundMiddleware = Container.resolve<NotFoundMiddleware>(TOKENS.NotFoundMiddleware)
-    this.app.use(notFoundMiddleware.handle.bind(notFoundMiddleware))
+    this.app.use(this.notFoundMiddleware.handle.bind(this.notFoundMiddleware))
 
     // Global error handler (MUST BE LAST)
-    const errorHandlerMiddleware = Container.resolve<ErrorHandlerMiddleware>(
-      TOKENS.ErrorHandlerMiddleware
-    )
-    this.app.use(errorHandlerMiddleware.handle.bind(errorHandlerMiddleware))
+    this.app.use(this.errorHandlerMiddleware.handle.bind(this.errorHandlerMiddleware))
 
     this.logger.info('Error handlers configured')
   }
@@ -137,16 +148,12 @@ export class App {
   /**
    * Start the HTTP server
    */
-  public async start(): Promise<void> {
+  public async start(): Promise<ReturnType<Express['listen']>> {
     const port = this.config.port
 
-    // TODO: Connect to database
-    // const prisma = Container.resolve(TOKENS.PrismaClient)
-    // await prisma.$connect()
-    // this.logger.info('Database connected')
+    this.logger.info('Database connected')
 
-    // Start server
-    this.app.listen(port, () => {
+    return this.app.listen(port, () => {
       this.logger.info(`🚀 Server running on port ${port}`)
       this.logger.info(`📚 Environment: ${this.config.nodeEnv}`)
       this.logger.info(`🔗 API Base URL: ${this.config.apiBaseUrl}`)
@@ -159,12 +166,6 @@ export class App {
    */
   public async shutdown(): Promise<void> {
     this.logger.info('Shutting down gracefully...')
-
-    // TODO: Close database connection
-    // const prisma = Container.resolve(TOKENS.PrismaClient)
-    // await prisma.$disconnect()
-    // this.logger.info('Database disconnected')
-
     this.logger.info('Shutdown complete')
   }
 }
