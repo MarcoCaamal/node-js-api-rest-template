@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config'
+import path from 'path'
 
 export default defineConfig({
   test: {
@@ -10,5 +11,10 @@ export default defineConfig({
       exclude: ['node_modules/', 'dist/', '**/*.config.{js,ts}', '**/*.d.ts', 'tests/**']
     },
     include: ['tests/**/*.test.ts', 'tests/**/*.spec.ts']
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
+    }
   }
 })
