@@ -1,125 +1,133 @@
-import 'reflect-metadata' // Required by TSyringe
-import { container } from 'tsyringe'
-import { Config } from './index'
-import { TOKENS } from './tokens'
+import 'reflect-metadata'
+import { container, type DependencyContainer } from 'tsyringe'
+import { PrismaClient } from '@/generated/prisma/client'
+import { Pool } from 'pg'
+import { PrismaPg } from '@prisma/adapter-pg'
+
+import { Config, TOKENS } from '@/config'
 import { ILogger } from '@/lib/logger'
+import { ConsoleLogger } from '@/lib/logger/console.logger'
+
+// Middlewares
 import {
+  CorsMiddleware,
   RequestIdMiddleware,
   LoggerMiddleware,
-  CorsMiddleware,
-  ErrorHandlerMiddleware,
-  NotFoundMiddleware
+  NotFoundMiddleware,
+  ErrorHandlerMiddleware
 } from '@/modules/common/middleware'
 
+// Module registrations
+import { registerIdentityModule } from '@/modules/identity/identity.module'
+
 /**
- * Container - Dependency Injection setup
+ * Composition Root — Dependency Injection Container
  *
- * Configures TSyringe container with all application dependencies.
- * Uses factory functions (no decorators) to keep classes clean.
- * Uses Symbols as tokens for type safety and no collisions.
+ * Uses tsyringe with factory providers (no decorators).
+ * Registers core dependencies (Config, Logger, Database, Middlewares)
+ * and delegates module-specific registrations to each module.
  *
- * Registration Strategy:
- * - Singletons: Config, Logger, Database connections
- * - Transients: Use Cases, Controllers (new instance per resolution)
- * - Scoped: Request-specific dependencies (future)
- *
- * @example
- * ```typescript
- * import { TOKENS } from '@/config/tokens'
- *
- * const config = Config.load()
- * Container.setup(config)
- *
- * const logger = Container.resolve<ILogger>(TOKENS.ILogger)
- * const middleware = Container.resolve<RequestIdMiddleware>(TOKENS.RequestIdMiddleware)
- * ```
+ * Bootstrap order:
+ * 1. Config (value provider — already instantiated)
+ * 2. Logger (factory — depends on Config)
+ * 3. Database (PgPool + PrismaClient — depends on Config)
+ * 4. Middlewares (factories — depend on Config + Logger)
+ * 5. Module registrations (Identity, etc.)
  */
-export class Container {
-  /**
-   * Setup dependency injection container
-   *
-   * Call this once at application startup, before creating the App
-   */
-  static setup(config: Config): void {
-    // ==========================================
-    // Core Dependencies
-    // ==========================================
 
-    // Config (singleton)
-    container.register<Config>(TOKENS.Config, {
-      useValue: config
-    })
+// ═══════════════════════════════════════════════════════════════════════════
+// 1. CORE — Configuration
+// ═══════════════════════════════════════════════════════════════════════════
 
-    // Logger (singleton)
-    container.register<ILogger>(TOKENS.ILogger, {
-      useFactory: () => config.createLogger()
-    })
+/**
+ * Initialize the DI container with all dependencies.
+ *
+ * Must be called once at application startup before resolving anything.
+ * Sets up the database connection pool and registers every dependency.
+ */
+export async function initContainer(config: Config): Promise<DependencyContainer> {
+  // ── Config ──────────────────────────────────────────────────────────
+  container.register<Config>(TOKENS.Config, { useValue: config })
 
-    // ==========================================
-    // Middlewares (transient - new instance each time)
-    // ==========================================
+  // ── Logger ──────────────────────────────────────────────────────────
+  container.register<ILogger>(TOKENS.ILogger, {
+    useFactory: (c) => {
+      const cfg = c.resolve<Config>(TOKENS.Config)
+      return new ConsoleLogger(cfg.logLevel)
+    }
+  })
 
-    container.register(TOKENS.RequestIdMiddleware, {
-      useFactory: () => new RequestIdMiddleware()
-    })
+  // ── Database ────────────────────────────────────────────────────────
+  const pool = new Pool({ connectionString: config.databaseUrl })
+  const adapter = new PrismaPg(pool)
+  const prismaClient = new PrismaClient({ adapter })
 
-    container.register(TOKENS.LoggerMiddleware, {
-      useFactory: (deps) => {
-        const logger = deps.resolve<ILogger>(TOKENS.ILogger)
-        return new LoggerMiddleware(logger)
-      }
-    })
+  container.register<PrismaClient>(TOKENS.PrismaClient, { useValue: prismaClient })
 
-    container.register(TOKENS.CorsMiddleware, {
-      useFactory: (deps) => {
-        const config = deps.resolve<Config>(TOKENS.Config)
-        return new CorsMiddleware(config.corsOptions)
-      }
-    })
+  // ── Middlewares ─────────────────────────────────────────────────────
+  registerMiddlewares(container)
 
-    container.register(TOKENS.NotFoundMiddleware, {
-      useFactory: (deps) => {
-        const config = deps.resolve<Config>(TOKENS.Config)
-        return new NotFoundMiddleware(config.apiBaseUrl)
-      }
-    })
+  // ── Module registrations ────────────────────────────────────────────
+  registerIdentityModule(container)
 
-    container.register(TOKENS.ErrorHandlerMiddleware, {
-      useFactory: (deps) => {
-        const logger = deps.resolve<ILogger>(TOKENS.ILogger)
-        const config = deps.resolve<Config>(TOKENS.Config)
-        return new ErrorHandlerMiddleware(logger, config.isDevelopment, config.apiBaseUrl)
-      }
-    })
-
-    // ==========================================
-    // TODO: Add module-specific dependencies
-    // ==========================================
-    // Example:
-    // container.register(TOKENS.UserRepository, {
-    //   useFactory: (deps) => {
-    //     const prisma = deps.resolve(TOKENS.PrismaClient)
-    //     return new PrismaUserRepository(prisma)
-    //   }
-    // })
-  }
-
-  /**
-   * Resolve a dependency from the container
-   *
-   * @example
-   * ```typescript
-   * const logger = Container.resolve<ILogger>(TOKENS.ILogger)
-   * ```
-   */
-  static resolve<T>(token: symbol): T {
-    return container.resolve<T>(token)
-  }
-
-  /**
-   * Clear all registered dependencies (useful for testing)
-   */
-  static clear(): void {
-    container.clearInstances()
-  }
+  return container
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 2. MIDDLEWARES — Global Express middlewares
+// ═══════════════════════════════════════════════════════════════════════════
+
+function registerMiddlewares(c: DependencyContainer): void {
+  c.register<CorsMiddleware>(TOKENS.CorsMiddleware, {
+    useFactory: (di) => {
+      const cfg = di.resolve<Config>(TOKENS.Config)
+      return new CorsMiddleware(cfg.corsOptions)
+    }
+  })
+
+  c.register<RequestIdMiddleware>(TOKENS.RequestIdMiddleware, {
+    useFactory: () => new RequestIdMiddleware()
+  })
+
+  c.register<LoggerMiddleware>(TOKENS.LoggerMiddleware, {
+    useFactory: (di) => {
+      const logger = di.resolve<ILogger>(TOKENS.ILogger)
+      return new LoggerMiddleware(logger)
+    }
+  })
+
+  c.register<NotFoundMiddleware>(TOKENS.NotFoundMiddleware, {
+    useFactory: (di) => {
+      const cfg = di.resolve<Config>(TOKENS.Config)
+      return new NotFoundMiddleware(cfg.apiBaseUrl)
+    }
+  })
+
+  c.register<ErrorHandlerMiddleware>(TOKENS.ErrorHandlerMiddleware, {
+    useFactory: (di) => {
+      const logger = di.resolve<ILogger>(TOKENS.ILogger)
+      const cfg = di.resolve<Config>(TOKENS.Config)
+      return new ErrorHandlerMiddleware(logger, cfg.isDevelopment, cfg.apiBaseUrl)
+    }
+  })
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. DISPOSAL — Graceful shutdown
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Gracefully dispose of container resources.
+ * Disconnects database pool and Prisma client.
+ */
+export async function disposeContainer(): Promise<void> {
+  const prisma = container.resolve<PrismaClient>(TOKENS.PrismaClient)
+
+  await prisma.$disconnect()
+}
+
+/**
+ * Re-export the tsyringe container instance for direct resolution.
+ * Prefer using typed resolve helpers or injection over direct access.
+ */
+export { container }
