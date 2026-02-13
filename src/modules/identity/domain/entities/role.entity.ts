@@ -7,6 +7,7 @@ interface RoleProps {
   id: RoleId
   name: string
   description: string
+  isSystem: boolean
   permissionIds: PermissionId[]
   createdAt: Date
   updatedAt: Date
@@ -41,6 +42,7 @@ export class Role {
     private readonly _id: RoleId,
     private _name: string,
     private _description: string,
+    private readonly _isSystem: boolean,
     private _permissionIds: PermissionId[],
     private readonly _createdAt: Date,
     private _updatedAt: Date
@@ -74,6 +76,7 @@ export class Role {
       RoleId.create(),
       props.name.toUpperCase().trim(),
       props.description.trim(),
+      false,
       [...permissionIds], // Copy array to prevent external mutation
       now,
       now
@@ -90,6 +93,7 @@ export class Role {
       props.id,
       props.name,
       props.description,
+      props.isSystem,
       [...props.permissionIds], // Copy array
       props.createdAt,
       props.updatedAt
@@ -234,6 +238,20 @@ export class Role {
   }
 
   /**
+   * Replaces all permissions in this role
+   */
+  replacePermissions(permissionIds: PermissionId[]): Result<void, ValidationError> {
+    const duplicateCheck = Role.validateNoDuplicatePermissions(permissionIds)
+    if (!duplicateCheck.isSuccess()) {
+      return duplicateCheck
+    }
+
+    this._permissionIds = [...permissionIds]
+    this._updatedAt = new Date()
+    return Result.ok(undefined)
+  }
+
+  /**
    * Returns a copy of all permission IDs
    */
   getPermissionIds(): PermissionId[] {
@@ -259,6 +277,10 @@ export class Role {
 
   get description(): string {
     return this._description
+  }
+
+  get isSystem(): boolean {
+    return this._isSystem
   }
 
   get createdAt(): Date {

@@ -153,6 +153,253 @@
  *             $ref: '#/components/schemas/PermissionResponse'
  *         pagination:
  *           $ref: '#/components/schemas/PaginationMetadata'
+ *
+ *     UserResponse:
+ *       type: object
+ *       description: User entity representation
+ *       required:
+ *         - id
+ *         - email
+ *         - firstName
+ *         - lastName
+ *         - fullName
+ *         - isActive
+ *         - roleId
+ *         - createdAt
+ *         - updatedAt
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *           description: Unique user identifier
+ *           example: 550e8400-e29b-41d4-a716-446655440000
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: User email address
+ *           example: user@example.com
+ *         firstName:
+ *           type: string
+ *           description: User first name
+ *           example: John
+ *         lastName:
+ *           type: string
+ *           description: User last name
+ *           example: Doe
+ *         fullName:
+ *           type: string
+ *           description: User full name
+ *           example: John Doe
+ *         isActive:
+ *           type: boolean
+ *           description: Whether the user is active
+ *           example: true
+ *         roleId:
+ *           type: string
+ *           format: uuid
+ *           description: Role identifier assigned to the user
+ *           example: 660e8400-e29b-41d4-a716-446655440001
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the user was created
+ *           example: 2026-02-07T13:26:24.206Z
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the user was last updated
+ *           example: 2026-02-07T13:26:24.206Z
+ *
+ *     CreateUserRequest:
+ *       type: object
+ *       description: Payload to create a new user
+ *       required:
+ *         - email
+ *         - password
+ *         - firstName
+ *         - lastName
+ *         - roleId
+ *       properties:
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: User email address
+ *           example: user@example.com
+ *         password:
+ *           type: string
+ *           format: password
+ *           minLength: 8
+ *           maxLength: 72
+ *           description: User password following security policy
+ *           example: SecureP@ss123!
+ *         firstName:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 100
+ *           example: John
+ *         lastName:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 100
+ *           example: Doe
+ *         roleId:
+ *           type: string
+ *           format: uuid
+ *           description: Role identifier assigned to the user
+ *           example: 660e8400-e29b-41d4-a716-446655440001
+ *
+ *     UpdateUserRequest:
+ *       type: object
+ *       description: Payload to update a user
+ *       properties:
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: User email address
+ *           example: user@example.com
+ *         password:
+ *           type: string
+ *           format: password
+ *           minLength: 8
+ *           maxLength: 72
+ *           description: User password following security policy
+ *           example: SecureP@ss123!
+ *         firstName:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 100
+ *           example: John
+ *         lastName:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 100
+ *           example: Doe
+ *         roleId:
+ *           type: string
+ *           format: uuid
+ *           description: Role identifier assigned to the user
+ *           example: 660e8400-e29b-41d4-a716-446655440001
+ *         isActive:
+ *           type: boolean
+ *           description: Whether the user is active
+ *           example: true
+ *
+ *     PaginatedUserResponse:
+ *       type: object
+ *       description: Paginated list of users
+ *       required:
+ *         - data
+ *         - pagination
+ *       properties:
+ *         data:
+ *           type: array
+ *           description: Array of user objects for the current page
+ *           items:
+ *             $ref: '#/components/schemas/UserResponse'
+ *         pagination:
+ *           $ref: '#/components/schemas/PaginationMetadata'
+ *
+ *     RoleResponse:
+ *       type: object
+ *       description: Role entity representation
+ *       required:
+ *         - id
+ *         - name
+ *         - description
+ *         - isSystem
+ *         - permissionIds
+ *         - createdAt
+ *         - updatedAt
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *           description: Unique role identifier
+ *           example: 4cc11769-29ef-46a1-9b7d-12d98b6c6ef5
+ *         name:
+ *           type: string
+ *           description: Role name (uppercase)
+ *           example: ADMIN
+ *         description:
+ *           type: string
+ *           description: Role description
+ *           example: System administrators
+ *         isSystem:
+ *           type: boolean
+ *           description: Whether the role is a system role
+ *           example: true
+ *         permissionIds:
+ *           type: array
+ *           description: Permission identifiers assigned to the role
+ *           items:
+ *             type: string
+ *             format: uuid
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the role was created
+ *           example: 2026-02-07T13:26:24.206Z
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp when the role was last updated
+ *           example: 2026-02-07T13:26:24.206Z
+ *
+ *     CreateRoleRequest:
+ *       type: object
+ *       description: Payload to create a new role (system roles are not allowed)
+ *       required:
+ *         - name
+ *         - description
+ *       properties:
+ *         name:
+ *           type: string
+ *           description: Role name (uppercase, numbers, underscores)
+ *           example: SUPPORT_AGENT
+ *         description:
+ *           type: string
+ *           description: Role description
+ *           example: Support team role
+ *         permissionIds:
+ *           type: array
+ *           description: Optional list of permission IDs to assign
+ *           items:
+ *             type: string
+ *             format: uuid
+ *
+ *     UpdateRoleRequest:
+ *       type: object
+ *       description: Payload to update a role (system roles cannot be edited)
+ *       properties:
+ *         name:
+ *           type: string
+ *           description: Role name (uppercase, numbers, underscores)
+ *           example: SUPPORT_LEAD
+ *         description:
+ *           type: string
+ *           description: Role description
+ *           example: Support team lead role
+ *         permissionIds:
+ *           type: array
+ *           description: Optional list of permission IDs to replace
+ *           items:
+ *             type: string
+ *             format: uuid
+ *
+ *     PaginatedRoleResponse:
+ *       type: object
+ *       description: Paginated list of roles
+ *       required:
+ *         - data
+ *         - pagination
+ *       properties:
+ *         data:
+ *           type: array
+ *           description: Array of role objects for the current page
+ *           items:
+ *             $ref: '#/components/schemas/RoleResponse'
+ *         pagination:
+ *           $ref: '#/components/schemas/PaginationMetadata'
  */
 
 // This file only contains JSDoc comments, no executable code

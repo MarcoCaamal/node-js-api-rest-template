@@ -135,6 +135,7 @@ export class RoleRepositoryImpl implements IRoleRepository {
           id: role.id.getValue(),
           name: role.name,
           description: role.description,
+          isSystem: role.isSystem,
           permissions: permissionIds.length ? { connect: permissionIds } : undefined,
           createdAt: role.createdAt,
           updatedAt: role.updatedAt
@@ -214,6 +215,7 @@ export class RoleRepositoryImpl implements IRoleRepository {
     id: string
     name: string
     description: string
+    isSystem: boolean
     permissions: { id: string }[]
     createdAt: Date
     updatedAt: Date
@@ -227,6 +229,7 @@ export class RoleRepositoryImpl implements IRoleRepository {
       id: roleId,
       name: record.name,
       description: record.description,
+      isSystem: record.isSystem,
       permissionIds,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt

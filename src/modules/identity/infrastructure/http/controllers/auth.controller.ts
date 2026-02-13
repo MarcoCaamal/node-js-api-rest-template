@@ -93,7 +93,7 @@ export class AuthController {
    *       - Passwords are hashed using bcrypt before storage
    *       - Password is never returned in the response
    *     tags:
-   *       - Authentication
+   *       - Auth
    *     requestBody:
    *       required: true
    *       content:
@@ -323,7 +323,7 @@ export class AuthController {
    *       **Error Format:**
    *       - Follows RFC 9457 Problem Details standard
    *     tags:
-   *       - Authentication
+   *       - Auth
    *     requestBody:
    *       required: true
    *       content:

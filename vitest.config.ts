@@ -10,7 +10,7 @@ export default defineConfig({
       reporter: ['text', 'json', 'html'],
       exclude: ['node_modules/', 'dist/', '**/*.config.{js,ts}', '**/*.d.ts', 'tests/**']
     },
-    include: ['tests/**/*.test.ts', 'tests/**/*.spec.ts']
+    include: ['src/**/*.test.ts', 'src/**/*.spec.ts']
   },
   resolve: {
     alias: {

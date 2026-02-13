@@ -39,6 +39,8 @@ export class PermissionsController {
    *     description: Retrieve a single permission by its unique identifier (UUID v4)
    *     tags:
    *       - Permissions
+   *     security:
+   *       - bearerAuth: []
    *     parameters:
    *       - in: path
    *         name: id
@@ -57,6 +59,10 @@ export class PermissionsController {
    *               $ref: '#/components/schemas/PermissionResponse'
    *       400:
    *         $ref: '#/components/responses/BadRequest'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       403:
+   *         $ref: '#/components/responses/Forbidden'
    *       404:
    *         $ref: '#/components/responses/NotFound'
    *       500:
@@ -91,6 +97,8 @@ export class PermissionsController {
    *     description: Retrieve a paginated list of all permissions in the system. Supports limit and offset parameters for pagination.
    *     tags:
    *       - Permissions
+   *     security:
+   *       - bearerAuth: []
    *     parameters:
    *       - in: query
    *         name: limit
@@ -141,6 +149,10 @@ export class PermissionsController {
    *                 totalPages: 1
    *       400:
    *         $ref: '#/components/responses/BadRequest'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       403:
+   *         $ref: '#/components/responses/Forbidden'
    *       500:
    *         $ref: '#/components/responses/InternalServerError'
    */
