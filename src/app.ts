@@ -10,6 +10,7 @@ import { LoggerMiddleware } from '@/modules/common/middleware/logger.middleware'
 import { NotFoundMiddleware } from '@/modules/common/middleware/not-found.middleware'
 import { ErrorHandlerMiddleware } from '@/modules/common/middleware/error-handler.middleware'
 import { PermissionsRoutes } from '@/modules/identity/infrastructure/http/routes/permissions.routes'
+import { AuthRoutes } from '@/modules/identity/infrastructure/http/routes/auth.routes'
 import { IDENTITY_TOKENS } from '@/modules/identity/identity.tokens'
 
 /**
@@ -46,6 +47,7 @@ export class App {
 
   // Module routes — resolved from container
   private readonly permissionsRoutes: PermissionsRoutes
+  private readonly authRoutes: AuthRoutes
 
   constructor() {
     // Resolve core dependencies
@@ -63,6 +65,7 @@ export class App {
 
     // Resolve module routes
     this.permissionsRoutes = container.resolve<PermissionsRoutes>(IDENTITY_TOKENS.PermissionsRoutes)
+    this.authRoutes = container.resolve<AuthRoutes>(IDENTITY_TOKENS.AuthRoutes)
 
     // Create Express app
     this.app = express()
@@ -174,6 +177,7 @@ export class App {
     )
 
     // Register module routes
+    this.app.use('/api/auth', this.authRoutes.getRouter())
     this.app.use('/api/permissions', this.permissionsRoutes.getRouter())
 
     this.logger.info('Routes configured')
