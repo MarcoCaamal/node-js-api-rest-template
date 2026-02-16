@@ -13,6 +13,15 @@ const pool = new Pool({ connectionString })
 const adapter = new PrismaPg(pool)
 const prisma = new PrismaClient({ adapter })
 
+const isProduction = process.env.NODE_ENV === 'production'
+const allowProdSeed = process.env.ALLOW_PROD_SEED === 'true'
+
+if (isProduction && !allowProdSeed) {
+  throw new Error(
+    'Refusing to run seed in production. Set ALLOW_PROD_SEED=true only if you explicitly want this.'
+  )
+}
+
 /**
  * Database Seeder for Identity Module (RBAC System)
  *
@@ -77,17 +86,7 @@ const SYSTEM_ROLES = [
   }
 ]
 
-// ============================================================================
-// 3. INITIAL ADMIN USER
-// ============================================================================
-
-const INITIAL_ADMIN = {
-  email: 'admin@system.local',
-  password: 'Admin123!@#', // CHANGE THIS IN PRODUCTION!
-  firstName: 'System',
-  lastName: 'Administrator',
-  isActive: true
-}
+const MIN_ADMIN_PASSWORD_LENGTH = 12
 
 // ============================================================================
 // SEED FUNCTIONS
@@ -171,6 +170,17 @@ async function seedInitialAdmin() {
     return
   }
 
+  const adminEmail = getRequiredEnv('ADMIN_EMAIL')
+  const adminPassword = getRequiredEnv('ADMIN_PASSWORD')
+  const adminFirstName = process.env.ADMIN_FIRST_NAME ?? 'System'
+  const adminLastName = process.env.ADMIN_LAST_NAME ?? 'Administrator'
+
+  if (adminPassword.length < MIN_ADMIN_PASSWORD_LENGTH) {
+    throw new Error(
+      `ADMIN_PASSWORD must be at least ${MIN_ADMIN_PASSWORD_LENGTH} characters long for security`
+    )
+  }
+
   // Find ADMIN role
   const adminRole = await prisma.role.findUnique({
     where: { name: 'ADMIN' }
@@ -181,24 +191,33 @@ async function seedInitialAdmin() {
   }
 
   // Hash password
-  const hashedPassword = await bcrypt.hash(INITIAL_ADMIN.password, 10)
+  const hashedPassword = await bcrypt.hash(adminPassword, 10)
 
   // Create user
   await prisma.user.create({
     data: {
-      email: INITIAL_ADMIN.email,
+      email: adminEmail,
       password: hashedPassword,
-      firstName: INITIAL_ADMIN.firstName,
-      lastName: INITIAL_ADMIN.lastName,
-      isActive: INITIAL_ADMIN.isActive,
+      firstName: adminFirstName,
+      lastName: adminLastName,
+      isActive: true,
       roleId: adminRole.id
     }
   })
 
   console.log('✅ Initial ADMIN user created')
-  console.log('📧 Email:', INITIAL_ADMIN.email)
-  console.log('🔑 Password:', INITIAL_ADMIN.password)
-  console.log('⚠️  IMPORTANT: Change this password in production!')
+  console.log('📧 Email:', adminEmail)
+  console.log('🔐 Password was loaded from ADMIN_PASSWORD environment variable')
+}
+
+function getRequiredEnv(name: string): string {
+  const value = process.env[name]?.trim()
+
+  if (!value) {
+    throw new Error(`${name} environment variable is required`)
+  }
+
+  return value
 }
 
 // ============================================================================
