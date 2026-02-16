@@ -55,6 +55,26 @@ export class Config {
     return this.env.NODE_ENV === 'test'
   }
 
+  get trustProxy(): boolean {
+    return this.env.TRUST_PROXY
+  }
+
+  get rateLimitGlobalWindowMs(): number {
+    return this.env.RATE_LIMIT_GLOBAL_WINDOW_MS
+  }
+
+  get rateLimitGlobalMax(): number {
+    return this.env.RATE_LIMIT_GLOBAL_MAX
+  }
+
+  get rateLimitAuthWindowMs(): number {
+    return this.env.RATE_LIMIT_AUTH_WINDOW_MS
+  }
+
+  get rateLimitAuthMax(): number {
+    return this.env.RATE_LIMIT_AUTH_MAX
+  }
+
   // Database Configuration
 
   get databaseUrl(): string {
@@ -98,10 +118,30 @@ export class Config {
 
   // CORS Configuration
 
+  get corsOrigins(): string[] {
+    return this.env.CORS_ORIGIN.split(',')
+      .map((origin) => origin.trim())
+      .filter((origin) => origin.length > 0)
+  }
+
+  get corsCredentials(): boolean {
+    return this.env.CORS_CREDENTIALS
+  }
+
   get corsOptions(): CorsOptions {
+    const origins = this.corsOrigins
+
+    if (this.corsCredentials && origins.includes('*')) {
+      throw new Error(
+        'Invalid CORS config: CORS_ORIGIN cannot include "*" when CORS_CREDENTIALS=true'
+      )
+    }
+
+    const origin: CorsOptions['origin'] = origins.length === 1 ? origins[0] : origins
+
     return {
-      origin: this.env.CORS_ORIGIN,
-      credentials: true,
+      origin,
+      credentials: this.corsCredentials,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID']
     }

@@ -38,7 +38,31 @@ const envSchema = z.object({
     .pipe(z.number().int().min(4).max(14)),
 
   // CORS
-  CORS_ORIGIN: z.string().default('*')
+  CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  CORS_CREDENTIALS: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+
+  // Reverse Proxy
+  TRUST_PROXY: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+
+  // Rate Limiting
+  RATE_LIMIT_GLOBAL_WINDOW_MS: z
+    .string()
+    .default('900000')
+    .transform(Number)
+    .pipe(z.number().int().min(1000)),
+  RATE_LIMIT_GLOBAL_MAX: z.string().default('200').transform(Number).pipe(z.number().int().min(1)),
+  RATE_LIMIT_AUTH_WINDOW_MS: z
+    .string()
+    .default('900000')
+    .transform(Number)
+    .pipe(z.number().int().min(1000)),
+  RATE_LIMIT_AUTH_MAX: z.string().default('10').transform(Number).pipe(z.number().int().min(1))
 })
 
 /**

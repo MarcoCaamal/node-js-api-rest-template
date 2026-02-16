@@ -1,4 +1,6 @@
 import express, { Express } from 'express'
+import rateLimit from 'express-rate-limit'
+import helmet from 'helmet'
 import { container } from 'tsyringe'
 import { apiReference } from '@scalar/express-api-reference'
 import { Config, TOKENS } from '@/config'
@@ -89,15 +91,36 @@ export class App {
    * ORDER MATTERS: body parsing -> cors -> requestId -> logger
    */
   private setupMiddlewares(): void {
+    // Express behind reverse proxy (Nginx, Traefik, Cloudflare, etc)
+    this.app.set('trust proxy', this.config.trustProxy)
+
+    // Security headers
+    this.app.use(
+      helmet({
+        contentSecurityPolicy: false
+      })
+    )
+
     // Body parsing
-    this.app.use(express.json())
-    this.app.use(express.urlencoded({ extended: true }))
+    this.app.use(express.json({ limit: '1mb' }))
+    this.app.use(express.urlencoded({ extended: true, limit: '1mb' }))
 
     // CORS (must be first to handle preflight requests)
     this.app.use(this.corsMiddleware.handle.bind(this.corsMiddleware))
 
     // Request ID (must be early to be available in all logs)
     this.app.use(this.requestIdMiddleware.handle.bind(this.requestIdMiddleware))
+
+    // Global rate limit
+    this.app.use(
+      rateLimit({
+        windowMs: this.config.rateLimitGlobalWindowMs,
+        limit: this.config.rateLimitGlobalMax,
+        standardHeaders: true,
+        legacyHeaders: false,
+        skip: (req) => req.path === '/health' || req.path.startsWith('/api/docs')
+      })
+    )
 
     // Logger (after requestId to include it in logs)
     this.app.use(this.loggerMiddleware.handle.bind(this.loggerMiddleware))
@@ -109,6 +132,16 @@ export class App {
    * Setup application routes
    */
   private setupRoutes(): void {
+    const authRateLimit = rateLimit({
+      windowMs: this.config.rateLimitAuthWindowMs,
+      limit: this.config.rateLimitAuthMax,
+      standardHeaders: true,
+      legacyHeaders: false
+    })
+
+    this.app.use('/api/auth/login', authRateLimit)
+    this.app.use('/api/auth/register', authRateLimit)
+
     /**
      * @openapi
      * /health:

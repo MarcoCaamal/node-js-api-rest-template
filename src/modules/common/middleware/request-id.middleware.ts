@@ -26,11 +26,14 @@ import { IMiddleware } from './middleware.interface'
  * ```
  */
 export class RequestIdMiddleware implements IMiddleware {
+  private static readonly MAX_REQUEST_ID_LENGTH = 128
+  private static readonly SAFE_REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]+$/
+
   constructor(private readonly headerName: string = 'x-request-id') {}
 
   handle(req: Request, res: Response, next: NextFunction): void {
-    // Get existing request ID or generate new one
-    const requestId = (req.headers[this.headerName] as string) || randomUUID()
+    const incomingRequestId = this.getValidIncomingRequestId(req)
+    const requestId = incomingRequestId ?? randomUUID()
 
     // Attach to request object
     req.id = requestId
@@ -39,6 +42,25 @@ export class RequestIdMiddleware implements IMiddleware {
     res.setHeader('X-Request-ID', requestId)
 
     next()
+  }
+
+  private getValidIncomingRequestId(req: Request): string | undefined {
+    const headerValue = req.get(this.headerName)
+
+    if (!headerValue) {
+      return undefined
+    }
+
+    const value = headerValue.trim()
+    if (!value || value.length > RequestIdMiddleware.MAX_REQUEST_ID_LENGTH) {
+      return undefined
+    }
+
+    if (!RequestIdMiddleware.SAFE_REQUEST_ID_PATTERN.test(value)) {
+      return undefined
+    }
+
+    return value
   }
 }
 
